@@ -11,10 +11,10 @@ def generate_init_routine(config, dest_d=None):
 
 	try:
 		routine = [
-			"sudo %(DOCKER_EXE)s build -t %(STUB_IMAGE)s .",
-			"sudo %(DOCKER_EXE)s run --name %(IMAGE_NAME)s -it %(STUB_IMAGE)s",
-			"sudo %(DOCKER_EXE)s commit %(IMAGE_NAME)s %(STUB_IMAGE)s",
-			"sudo %(DOCKER_EXE)s stop %(IMAGE_NAME)s"
+			"%(DOCKER_EXE)s build -t %(STUB_IMAGE)s .",
+			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -it %(STUB_IMAGE)s",
+			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(STUB_IMAGE)s",
+			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s"
 		]
 
 		return build_routine([r % config for r in routine], dest_d=dest_d)
@@ -35,13 +35,13 @@ def generate_build_routine(config, commit_to, dest_d=None):
 
 	try:
 		routine = [
-			"sudo %(DOCKER_EXE)s build -t %(FINAL_IMAGE)s .",
-			"sudo %(DOCKER_EXE)s rm %(IMAGE_NAME)s",
-			"sudo %(DOCKER_EXE)s rmi %(STUB_IMAGE)s",
-			"sudo %(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(FINAL_IMAGE)s",
-			"echo $(sudo %(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit",
-			"sudo %(DOCKER_EXE)s stop %(IMAGE_NAME)s",
-			"sudo %(DOCKER_EXE)s rm %(IMAGE_NAME)s"
+			"%(DOCKER_EXE)s build -t %(FINAL_IMAGE)s .",
+			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s",
+			"%(DOCKER_EXE)s rmi %(STUB_IMAGE)s",
+			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(FINAL_IMAGE)s",
+			"echo $(%(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit",
+			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
+			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
 		]
 
 		return build_routine([r % config for r in routine], dest_d=dest_d)
@@ -102,11 +102,19 @@ def get_docker_exe():
 			print "No Docker to use!  Please install docker!"
 			return None
 
+	with settings(warn_only=True):
+		uname = local("uname", capture=True)
+		if uname == "Linux":
+			docker = "sudo %s" % docker
+
 	return docker
 
-def build_routine(routine, dest_d=None):
+def build_routine(routine, to_file=None, dest_d=None):
+	if to_file is None:
+		to_file = os.path.join(BASE_DIR if dest_d is None else dest_d, ".routine.sh")
+
 	try:
-		with open(os.path.join(BASE_DIR if dest_d is None else dest_d, ".routine.sh"), 'wb+') as r:
+		with open(to_file, 'wb+') as r:
 			r.write("\n".join(routine))
 		
 		return True
