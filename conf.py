@@ -37,7 +37,7 @@ def build_config(config_keys, with_config=None):
 			value = prompt("[ENTER for default ( %s )]: " % c.default)
 
 			if len(value) > 0:
-				config[c.label] = value if c.value is None else c.value(value)
+				config[c.label] = value if c.value_transform is None else c.value_transform(value)
 			else:
 				config[c.label] = c.default
 
