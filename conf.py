@@ -3,7 +3,7 @@ from collections import namedtuple
 from fabric.operations import prompt
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.join(__file__, os.pardir), os.pardir))
-DUtilKey = namedtuple("DUtilKey", ["label", "description", "default", "default_str", "value_transform"])
+DUtilsKey = namedtuple("DUtilKey", ["label", "description", "default", "default_str", "value_transform"])
 
 SUS_RANDO = "sus_rando"
 BEEP_BOP = "beepBop"
@@ -58,7 +58,7 @@ def save_config(with_config, to_file=None):
 
 	return False
 
-def __append_to_config(append_to_config, to_file=None, return_config=False):
+def append_to_config(append_to_config, to_file=None, return_config=False):
 	if to_file is None:
 		to_file = os.path.join(BASE_DIR, "config.json")
 
