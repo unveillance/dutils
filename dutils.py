@@ -1,10 +1,67 @@
 import re, os
+from conf import BASE_DIR
+
+def generate_init_routine(config, dest_d=None):
+	if 'DOCKER_EXE' not in config.keys():
+		config['DOCKER_EXE'] = get_docker_exe()
+
+	if config['DOCKER_EXE'] is None:
+		print "no docker exe."
+		return False
+
+	try:
+		routine = [
+			"sudo %(DOCKER_EXE)s build -t %(STUB_IMAGE)s .",
+			"sudo %(DOCKER_EXE)s run --name %(IMAGE_NAME)s -it %(STUB_IMAGE)s",
+			"sudo %(DOCKER_EXE)s commit %(IMAGE_NAME)s %(STUB_IMAGE)s",
+			"sudo %(DOCKER_EXE)s stop %(IMAGE_NAME)s"
+		]
+
+		return build_routine([r % config for r in routine], dest_d=dest_d)
+	except Exception as e:
+		print e, type(e)
+
+	return False
+
+def generate_build_routine(config, commit_to, dest_d=None):
+	if 'DOCKER_EXE' not in config.keys():
+		config['DOCKER_EXE'] = get_docker_exe()
+
+	if config['DOCKER_EXE'] is None:
+		print "no docker exe."
+		return False
+
+	config['COMMIT_TO'] = commit_to
+
+	try:
+		routine = [
+			"sudo %(DOCKER_EXE)s build -t %(FINAL_IMAGE)s .",
+			"sudo %(DOCKER_EXE)s rm %(IMAGE_NAME)s",
+			"sudo %(DOCKER_EXE)s rmi %(STUB_IMAGE)s",
+			"sudo %(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(FINAL_IMAGE)s",
+			"echo $(sudo %(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit",
+			"sudo %(DOCKER_EXE)s stop %(IMAGE_NAME)s",
+			"sudo %(DOCKER_EXE)s rm %(IMAGE_NAME)s"
+		]
+
+		return build_routine([r % config for r in routine], dest_d=dest_d)
+	except Exception as e:
+		print e, type(e)
+
+	return False
+
+def build_bash_profile(directives, dest_d=None):
+	try:
+		with open(os.path.join(BASE_DIR if dest_d is None else dest_d, ".bash_profile"), 'wb+') as B:
+			B.write("\n".join(directives))
+		return True
+	
+	except Exception as e:
+		print e, type(e)
+
+	return False
 
 def build_dockerfile(src_d, config, dest_d=None):
-	if dest_d is None:
-		from conf import BASE_DIR
-		dest_d = BASE_DIR
-
 	dockerfile = []
 	rx = re.compile("\$\{(%s)\}" % "|".join(config.keys()))
 
@@ -19,7 +76,7 @@ def build_dockerfile(src_d, config, dest_d=None):
 
 				dockerfile.append(line)
 
-		with open(os.path.join(dest_d, "Dockerfile"), 'wb+') as d:
+		with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "Dockerfile"), 'wb+') as d:
 			d.write("\n".join(dockerfile))
 		
 		return True
@@ -48,12 +105,8 @@ def get_docker_exe():
 	return docker
 
 def build_routine(routine, dest_d=None):
-	if dest_d is None:
-		from conf import BASE_DIR
-		dest_d = BASE_DIR
-
 	try:
-		with open(os.path.join(dest_d, ".routine.sh"), 'wb+') as r:
+		with open(os.path.join(BASE_DIR if dest_d is None else dest_d, ".routine.sh"), 'wb+') as r:
 			r.write("\n".join(routine))
 		
 		return True

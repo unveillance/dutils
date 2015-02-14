@@ -3,7 +3,17 @@ from collections import namedtuple
 from fabric.operations import prompt
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.join(__file__, os.pardir), os.pardir))
-DUtilKey = namedtuple("DUtilKey", ["label", "description", "default", "default_str", "value"])
+DUtilKey = namedtuple("DUtilKey", ["label", "description", "default", "default_str", "value_transform"])
+
+SUS_RANDO = "sus_rando"
+BEEP_BOP = "beepBop"
+DDOC_NAME = "my_docker_image"
+
+DUtilKeyDefaults = {
+	'USER' : DUtilsKey("USER", "system user", SUS_RANDO, SUS_RANDO, None),
+	'USER_PWD' : DUtilsKey("USER_PWD", "system user's password", BEEP_BOP, BEEP_BOP, None),
+	'IMAGE_NAME' : DUtilsKey("IMAGE_NAME", "name of docker image", DDOC_NAME, DDOC_NAME, None)
+}
 
 def build_config(config_keys, with_config=None):
 	config = {}
@@ -35,7 +45,7 @@ def build_config(config_keys, with_config=None):
 
 def save_config(with_config, to_file=None):
 	if to_file is None:
-		to_file = os.path.join(BASE_DIR, "coven.json")
+		to_file = os.path.join(BASE_DIR, "config.json")
 
 	try:
 		with open(to_file, 'wb+') as c:
@@ -50,7 +60,7 @@ def save_config(with_config, to_file=None):
 
 def __append_to_config(append_to_config, to_file=None, return_config=False):
 	if to_file is None:
-		to_file = os.path.join(BASE_DIR, "coven.json")
+		to_file = os.path.join(BASE_DIR, "config.json")
 
 	try:
 		with open(to_file, 'rb') as c:
