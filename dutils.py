@@ -2,7 +2,8 @@ import re, os
 
 def build_dockerfile(src_d, config, dest_d=None):
 	if dest_d is None:
-		dest_d = os.path.abspath(os.path.join(os.path.join(__file__, os.pardir), os.pardir))
+		from conf import BASE_DIR
+		dest_d = BASE_DIR
 
 	dockerfile = []
 	rx = re.compile("\$\{(%s)\}" % "|".join(config.keys()))
@@ -48,8 +49,9 @@ def get_docker_exe():
 
 def build_routine(routine, dest_d=None):
 	if dest_d is None:
-		dest_d = os.path.abspath(os.path.join(os.path.join(__file__, os.pardir), os.pardir))
-		
+		from conf import BASE_DIR
+		dest_d = BASE_DIR
+
 	try:
 		with open(os.path.join(dest_d, ".routine.sh"), 'wb+') as r:
 			r.write("\n".join(routine))
