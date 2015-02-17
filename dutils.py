@@ -89,15 +89,13 @@ def generate_init_routine(config, dest_d=None):
 
 	return False
 
-def generate_build_routine(config, commit_to, dest_d=None):
+def generate_build_routine(config, dest_d=None):
 	if 'DOCKER_EXE' not in config.keys():
 		config['DOCKER_EXE'] = get_docker_exe()
 
 	if config['DOCKER_EXE'] is None:
 		print "no docker exe."
 		return False
-
-	config['COMMIT_TO'] = commit_to
 
 	try:
 		routine = [
