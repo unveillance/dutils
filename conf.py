@@ -9,7 +9,7 @@ SUS_RANDO = "sus_rando"
 BEEP_BOP = "beepBop"
 DDOC_NAME = "my_docker_image"
 
-DUtilKeyDefaults = {
+DUtilsKeyDefaults = {
 	'USER' : DUtilsKey("USER", "system user", SUS_RANDO, SUS_RANDO, None),
 	'USER_PWD' : DUtilsKey("USER_PWD", "system user's password", BEEP_BOP, BEEP_BOP, None),
 	'IMAGE_NAME' : DUtilsKey("IMAGE_NAME", "name of docker image", DDOC_NAME, DDOC_NAME, None)
