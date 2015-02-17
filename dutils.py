@@ -1,11 +1,11 @@
 import re, os, json
 from sys import stdin
+from fabric.api import settings, local
 
-from conf import BASE_DIR
+from conf import BASE_DIR, __load_config, save_config
 
 def generate_run_routine(config=None, dest_d=None):
 	if config is None:
-		from conf import __load_config
 		config = __load_config(BASE_DIR, "config.json")
 
 	if 'PUBLISH_PORTS' not in config['keys']:
@@ -21,9 +21,9 @@ def generate_run_routine(config=None, dest_d=None):
 		print d_info
 		
 		for p in d_info.keys():
-			published_ports.append([int(re.match(r'(\d+)/tcp', p).group()), int(p[0]['HostPort']]))
+			published_ports.append([int(re.match(r'(\d+)/tcp', p).group()), int(d_info[p][0]['HostPort'])])
 
-		config['PUBLISHED_PORTS_STR'] = " %d > %d, ".join([**p for p in published_ports])[1:]
+		config['PUBLISHED_PORTS_STR'] = ", ".join(["%d > %d" % (p, p) for p in published_ports])[1:]
 
 		routine = [
 			"%(DOCKER_EXE)s ps -a | grep %(IMAGE_NAME)s",
@@ -45,7 +45,6 @@ def generate_run_routine(config=None, dest_d=None):
 
 def generate_shutdown_routine(config=None, dest_d=None):
 	if config is None:
-		from conf import __load_config
 		config = __load_config(BASE_DIR, "config.json")
 
 	try:
@@ -80,6 +79,9 @@ def generate_init_routine(config, dest_d=None):
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
 		]
+
+		del config['USER_PWD']
+		save_config(config)
 
 		return build_routine([r % config for r in routine], dest_d=dest_d)
 	except Exception as e:
@@ -126,7 +128,7 @@ def build_bash_profile(directives, dest_d=None):
 
 	return False
 
-def build_dockerfile(src_d, config, dest_d=None):
+def build_dockerfile(src_dockerfile, config, dest_d=None):
 	dockerfile = []
 	rx = re.compile("\$\{(%s)\}" % "|".join(config.keys()))
 
@@ -152,8 +154,6 @@ def build_dockerfile(src_d, config, dest_d=None):
 	return False
 
 def get_docker_exe():
-	from fabric.api import settings, local
-
 	with settings(warn_only=True):
 		docker = local("which docker", capture=True)
 
@@ -175,13 +175,15 @@ def get_docker_exe():
 	return docker
 
 def get_docker_ip():
+	docker_ip = "127.0.0.1"
+
 	with settings(warn_only=True):
 		uname = local("uname", capture=True)
 
 		if uname != "Linux":
-			return "$(boot2docker ip)"
+			docker_ip = local("echo $(boot2docker ip)", capture=True)
 
-	return "127.0.0.1"
+	return docker_ip
 
 def build_routine(routine, to_file=None, dest_d=None):
 	if to_file is None:
