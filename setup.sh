@@ -37,5 +37,6 @@ done
 cp dutils/stop.sh .
 chmod +x run.sh
 chmod +x shutdown.sh
+chmod +x update.sh
 
 do_exit
