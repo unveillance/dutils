@@ -8,22 +8,28 @@ def generate_run_routine(config=None, dest_d=None):
 	if config is None:
 		config = __load_config(BASE_DIR, "config.json")
 
-	if 'PUBLISH_PORTS' not in config['keys']:
+	if 'PUBLISH_PORTS' not in config.keys():
 		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
-		config['PUBLISH_PORTS'] = "None"
 	else:
-		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS)s %(IMAGE_NAME)s:latest"
+		p_sep = " -p "
+		config['PUBLISH_PORTS_STR'] = ("%s%s" % (p_sep, p_sep.join(["%d:%d" % (p, p) for p in config['PUBLISH_PORTS']])))[1:]
+		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
 	
 	try:
 		d_info = json.loads(stdin.read())[0]['HostConfig']['PortBindings']
-		published_ports = []
-		
-		print d_info
-		
-		for p in d_info.keys():
-			published_ports.append([int(re.match(r'(\d+)/tcp', p).group()), int(d_info[p][0]['HostPort'])])
+		mapped_ports = [] if 'PUBLISH_PORTS' not in config.keys() else config['PUBLISH_PORTS']
+		port_bindings = []
 
-		config['PUBLISHED_PORTS_STR'] = ", ".join(["%d > %d" % (p, p) for p in published_ports])[1:]
+		for p in d_info.keys():
+			port = int(re.findall(r'(\d+)/tcp', p)[0])
+			mapping = int(d_info[p][0]['HostPort'])
+
+			if port in mapped_ports:
+				mapping = port
+
+			port_bindings.append([port, mapping])
+
+		config['PORT_BINDINGS_STR'] = ", ".join(["%d > %d" % (p[0], p[1]) for p in port_bindings])
 
 		routine = [
 			"%(DOCKER_EXE)s ps -a | grep %(IMAGE_NAME)s",
@@ -34,7 +40,7 @@ def generate_run_routine(config=None, dest_d=None):
 			r,
 			"echo \"%(IMAGE_NAME)s has started.\"",
 			"echo \"ip address: %(DOCKER_IP)s\"",
-			"echo \"port mappings: %(PUBLISHED_PORTS_STR)s\""
+			"echo \"port mappings: %(PORT_BINDINGS_STR)s\""
 		]
 
 		return build_routine([r % config for r in routine], dest_d=os.path.join(BASE_DIR, "run.sh") if dest_d is None else dest_d)
@@ -75,6 +81,7 @@ def generate_init_routine(config, dest_d=None):
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:init .",
 			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(IMAGE_NAME)s:init",
+			"echo \"Commiting image.  This might take awhile...\"",
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:init",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
@@ -100,7 +107,6 @@ def generate_build_routine(config, dest_d=None):
 	try:
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
-			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s",
 			"%(DOCKER_EXE)s rmi %(IMAGE_NAME)s:init",
 			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest",
 			"echo $(%(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit",

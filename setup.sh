@@ -25,7 +25,6 @@ pip install -r dutils/requirements.txt
 # Run Docker init
 declare -a D_ROUTINES=("init $2" "build" "commit")
 for DR in "${D_ROUTINES[@]}"; do
-	echo $DR
 	python $DUTILS_PKG_ROOT.py $DR
 	if ([ $?  -eq 0 ]); then
 		run_docker_routine
