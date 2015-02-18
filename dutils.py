@@ -37,7 +37,11 @@ def generate_run_routine(config=None, dest_d=None):
 			"\techo \"Stopping current instance first.\"",
 			"\t./stop.sh",
 			"fi",
-			r,
+			"if ([ $# -eq 0 ]); then",
+			"\t%s" % r,
+			"else",
+			("\t%s /bin/bash" % r).replace("-dPt", "-iPt"),
+			"fi",
 			"echo \"%(IMAGE_NAME)s has started.\"",
 			"echo \"ip address: %(DOCKER_IP)s\"",
 			"echo \"port mappings: %(PORT_BINDINGS_STR)s\""
