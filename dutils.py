@@ -39,6 +39,9 @@ def generate_run_routine(config=None, dest_d=None):
 			"fi",
 			"if ([ $# -eq 0 ]); then",
 			"\t%s ./run.sh" % r,
+			"\techo \"%(IMAGE_NAME)s has started.\"",
+			"\techo \"ip address: %(DOCKER_IP)s\"",
+			"\techo \"port mappings: %(PORT_BINDINGS_STR)s\"",
 			"else",
 			"\tif [[ $1 == \"shell\" ]]; then",
 			("\t\t%s /bin/bash" % r).replace("-dPt", "-iPt"),
@@ -46,10 +49,7 @@ def generate_run_routine(config=None, dest_d=None):
 			"\t\t./update.sh",
 			"\t\texit",
 			"\tfi",
-			"fi",
-			"echo \"%(IMAGE_NAME)s has started.\"",
-			"echo \"ip address: %(DOCKER_IP)s\"",
-			"echo \"port mappings: %(PORT_BINDINGS_STR)s\""
+			"fi"
 		]
 
 		if generate_update_routine(config):

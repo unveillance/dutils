@@ -28,6 +28,7 @@ for DR in "${D_ROUTINES[@]}"; do
 	python $DUTILS_PKG_ROOT.py $DR
 	if ([ $?  -eq 0 ]); then
 		run_docker_routine
+		echo "Moving on!"
 	else
 		echo "FAILED."
 		do_exit
