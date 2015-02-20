@@ -16,7 +16,7 @@ def generate_run_routine(config=None, dest_d=None):
 		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
 	
 	try:
-		d_info = json.loads(stdin.read())[0]['HostConfig']['PortBindings']
+		d_info = json.loads(stdin)[0]['HostConfig']['PortBindings']
 		mapped_ports = [] if 'PUBLISH_PORTS' not in config.keys() else config['PUBLISH_PORTS']
 		port_bindings = []
 
