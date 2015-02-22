@@ -1,4 +1,4 @@
-import os, json
+import os, json, re
 from collections import namedtuple
 from fabric.operations import prompt
 
@@ -14,6 +14,14 @@ DUtilsKeyDefaults = {
 	'USER_PWD' : DUtilsKey("USER_PWD", "system user's password", BEEP_BOP, BEEP_BOP, None),
 	'IMAGE_NAME' : DUtilsKey("IMAGE_NAME", "name of docker image", DDOC_NAME, DDOC_NAME, None)
 }
+
+def is_acceptable_str(str):
+	try:
+		return re.match(r'.*[\s]+', str) is None
+	except Exception as e:
+		print e, type(e)
+
+	return False
 
 def build_config(config_keys, with_config=None):
 	config = {}
@@ -37,7 +45,14 @@ def build_config(config_keys, with_config=None):
 			value = prompt("[ENTER for default ( %s )]: " % c.default)
 
 			if len(value) > 0:
-				config[c.label] = value if c.value_transform is None else c.value_transform(value)
+				if c.value_transform is None:
+					if not is_acceptable_str(value.strip()):
+						value = c.default
+
+				else:
+					value = c.value_transform(value)
+
+				config[c.label] = value
 			else:
 				config[c.label] = c.default
 
