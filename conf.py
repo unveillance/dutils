@@ -58,13 +58,13 @@ def build_config(config_keys, with_config=None):
 
 	return config
 
-def save_config(with_config, to_file=None):
-	if to_file is None:
-		to_file = os.path.join(BASE_DIR, "config.json")
+def save_config(config, with_config=None):
+	if with_config is None:
+		with_config = os.path.join(BASE_DIR, "config.json")
 
 	try:
-		with open(to_file, 'wb+') as c:
-			c.write(json.dumps(with_config))
+		with open(with_config, 'wb+') as c:
+			c.write(json.dumps(config))
 
 		return True
 	except Exception as e:
@@ -73,16 +73,16 @@ def save_config(with_config, to_file=None):
 
 	return False
 
-def append_to_config(append_to_config, to_file=None, return_config=False):
-	if to_file is None:
-		to_file = os.path.join(BASE_DIR, "config.json")
+def append_to_config(append_to_config, with_config=None, return_config=False):
+	if with_config is None:
+		with_config = os.path.join(BASE_DIR, "config.json")
 
 	try:
-		with open(to_file, 'rb') as c:
+		with open(with_config, 'rb') as c:
 			config = json.loads(c.read())
 			config.update(append_to_config)
 
-		with open(to_file, 'wb+') as c:
+		with open(with_config, 'wb+') as c:
 			c.write(json.dumps(config))
 
 		if return_config:
@@ -94,7 +94,10 @@ def append_to_config(append_to_config, to_file=None, return_config=False):
 
 	return False
 
-def __load_config(with_config):
+def __load_config(with_config=None):
+	if with_config is None:
+		with_config = os.path.join(BASE_DIR, "config.json")
+		
 	try:
 		with open(with_config, 'rb') as c:
 			return json.loads(c.read())
