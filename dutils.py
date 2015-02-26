@@ -4,7 +4,7 @@ from fabric.api import settings, local
 
 from conf import BASE_DIR, __load_config, save_config
 
-def generate_run_routine(config=None, dest_d=None):
+def generate_run_routine(config=None, dest_d=None, src_dirs=None):
 	if config is None:
 		config = __load_config(BASE_DIR, "config.json")
 
@@ -52,7 +52,7 @@ def generate_run_routine(config=None, dest_d=None):
 			"fi"
 		]
 
-		if generate_update_routine(config):
+		if generate_update_routine(config, src_dirs=src_dirs):
 			return build_routine([r % config for r in routine], dest_d=os.path.join(BASE_DIR, "run.sh") if dest_d is None else dest_d)
 	
 	except Exception as e:
@@ -68,6 +68,7 @@ def generate_shutdown_routine(config=None, dest_d=None):
 		routine = [
 			"echo $1 | grep y",
 			"if ([ $? -eq 0 ]); then",
+			"\t%(DOCKER_EXE)s start %(IMAGE_NAME)s",
 			"\t%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
 			"fi",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
@@ -132,9 +133,24 @@ def generate_build_routine(config, dest_d=None):
 
 	return False
 
-def generate_update_routine(config, dest_d=None):
+def generate_update_routine(config, dest_d=None, src_dirs=None):
 	try:
 		routine = [
+			"THIS_DIR=$(pwd)",
+			"EXPRESS_DIR=%s" % BASE_DIR,
+			"./stop.sh"
+		]
+
+		if src_dirs is not None:
+			if type(src_dirs) in [str, unicode]:
+				src_dirs = [src_dirs]
+
+		if type(src_dirs) is list:
+			for src_dir in src_dirs:
+				routine.append("cd $EXPRESS_DIR/src/%s && git pull origin master" % src_dir)
+
+		routine += [
+			"cd $EXPRESS_DIR",
 			"source venv/bin/activate",
 			"python %(COMMIT_TO)s.py update",
 			"if ([ $? -eq 0 ]); then",
@@ -145,7 +161,8 @@ def generate_update_routine(config, dest_d=None):
 			"\t%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
 			"\t%(DOCKER_EXE)s rm %(IMAGE_NAME)s",
 			"fi",
-			"deactivate venv"
+			"deactivate venv",
+			"cd $THIS_DIR"
 		]
 
 		return build_routine([r % config for r in routine], dest_d=os.path.join(BASE_DIR, "update.sh") if dest_d is None else dest_d)
