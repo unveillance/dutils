@@ -12,7 +12,7 @@ DDOC_NAME = "my_docker_image"
 DUtilsKeyDefaults = {
 	'USER' : DUtilsKey("USER", "system user", SUS_RANDO, SUS_RANDO, None),
 	'USER_PWD' : DUtilsKey("USER_PWD", "system user's password", BEEP_BOP, BEEP_BOP, None),
-	'IMAGE_NAME' : DUtilsKey("IMAGE_NAME", "name of docker image", DDOC_NAME, DDOC_NAME, None)
+	'IMAGE_NAME' : DUtilsKey("IMAGE_NAME", "name of docker image", DDOC_NAME, DDOC_NAME, None),
 }
 
 def is_acceptable_str(str):
@@ -54,17 +54,18 @@ def build_config(config_keys, with_config=None):
 
 				config[c.label] = value
 			else:
+				print "USING DEFAULT: %s" % c.default
 				config[c.label] = c.default
 
 	return config
 
-def save_config(with_config, to_file=None):
-	if to_file is None:
-		to_file = os.path.join(BASE_DIR, "config.json")
+def save_config(config, with_config=None):
+	if with_config is None:
+		with_config = os.path.join(BASE_DIR, "config.json")
 
 	try:
-		with open(to_file, 'wb+') as c:
-			c.write(json.dumps(with_config))
+		with open(with_config, 'wb+') as c:
+			c.write(json.dumps(config))
 
 		return True
 	except Exception as e:
@@ -73,16 +74,16 @@ def save_config(with_config, to_file=None):
 
 	return False
 
-def append_to_config(append_to_config, to_file=None, return_config=False):
-	if to_file is None:
-		to_file = os.path.join(BASE_DIR, "config.json")
+def append_to_config(append_to_config, with_config=None, return_config=False):
+	if with_config is None:
+		with_config = os.path.join(BASE_DIR, "config.json")
 
 	try:
-		with open(to_file, 'rb') as c:
+		with open(with_config, 'rb') as c:
 			config = json.loads(c.read())
 			config.update(append_to_config)
 
-		with open(to_file, 'wb+') as c:
+		with open(with_config, 'wb+') as c:
 			c.write(json.dumps(config))
 
 		if return_config:
@@ -94,7 +95,10 @@ def append_to_config(append_to_config, to_file=None, return_config=False):
 
 	return False
 
-def __load_config(with_config):
+def __load_config(with_config=None):
+	if with_config is None:
+		with_config = os.path.join(BASE_DIR, "config.json")
+		
 	try:
 		with open(with_config, 'rb') as c:
 			return json.loads(c.read())

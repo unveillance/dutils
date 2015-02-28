@@ -23,9 +23,9 @@ source venv/bin/activate
 pip install -r dutils/requirements.txt
 
 # Run Docker init
-declare -a D_ROUTINES=("init $2" "build" "commit")
+declare -a D_ROUTINES=("init" "build" "commit")
 for DR in "${D_ROUTINES[@]}"; do
-	python $DUTILS_PKG_ROOT.py $DR
+	python $DUTILS_PKG_ROOT.py $DR $2
 	if ([ $?  -eq 0 ]); then
 		run_docker_routine
 		echo "Moving on!"
@@ -39,5 +39,6 @@ cp dutils/stop.sh .
 chmod +x run.sh
 chmod +x shutdown.sh
 chmod +x update.sh
+chmod +x stop.sh
 
 do_exit

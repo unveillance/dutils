@@ -2,12 +2,62 @@ import re, os, json
 from sys import stdin
 from fabric.api import settings, local
 
-from conf import BASE_DIR, __load_config, save_config
+from conf import BASE_DIR, __load_config, save_config, append_to_config
 
-def generate_run_routine(config=None, dest_d=None, src_dirs=None):
-	if config is None:
-		config = __load_config(BASE_DIR, "config.json")
+def validate_private_key(ssh_priv_key, with_config):
+	config = __load_config(os.path.join(BASE_DIR, "config.json") if with_config is None else with_config)
 
+	if ssh_priv_key is None:
+		ssh_priv_key = os.path.join(BASE_DIR, "%s.privkey" % config['IMAGE_NAME'])
+
+	if not os.path.exists(ssh_priv_key):
+		from fabric.operations import prompt
+		ssh_priv_key_pwd = prompt("Give a password to your ssh key (or ENTER for no password)")
+
+		if len(ssh_priv_key_pwd) == 0:
+			ssh_priv_key_pwd = "\"\""
+
+		with settings(warn_only=True):
+			local("ssh-keygen -f %s -t rsa -b 4096 -N %s" % (ssh_priv_key, ssh_priv_key_pwd))
+
+	ssh_pub_key = "%s.pub" % ssh_priv_key
+	if not os.path.exists(ssh_priv_key) or not os.path.exists(ssh_pub_key):
+		print "Sorry, there is no key made at %s" % ssh_priv_key
+		return None
+
+	return append_to_config({
+		'SSH_PUB_KEY' : os.path.abspath(ssh_pub_key),
+		'SSH_PRIV_KEY' : os.path.abspath(ssh_priv_key)
+	}, with_config=with_config)
+
+def parse_ports(config):
+	try:
+		d_info = json.loads(stdin)[0]['HostConfig']['PortBindings']
+	except Exception as e:
+		print "could not get any stdin."
+		print e, type(e)
+		return config, None
+
+	mapped_ports = [] if 'PUBLISH_PORTS' not in config.keys() else config['PUBLISH_PORTS']
+	port_bindings = []
+
+	for p in d_info.keys():
+		port = int(re.findall(r'(\d+)/tcp', p)[0])
+		mapping = int(d_info[p][0]['HostPort'])
+
+		if port == 22:
+			config['SSH_PORT'] = mapping
+
+		if port in mapped_ports:
+			mapping = port
+
+		port_bindings.append([port, mapping])
+
+	config['PORT_BINDINGS_STR'] = ", ".join(["%d > %d" % (p[0], p[1]) for p in port_bindings])
+
+	return config, d_info
+
+def generate_run_routine(config, with_config=None, src_dirs=None):
 	if 'PUBLISH_PORTS' not in config.keys():
 		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
 	else:
@@ -16,20 +66,7 @@ def generate_run_routine(config=None, dest_d=None, src_dirs=None):
 		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
 	
 	try:
-		d_info = json.loads(stdin)[0]['HostConfig']['PortBindings']
-		mapped_ports = [] if 'PUBLISH_PORTS' not in config.keys() else config['PUBLISH_PORTS']
-		port_bindings = []
-
-		for p in d_info.keys():
-			port = int(re.findall(r'(\d+)/tcp', p)[0])
-			mapping = int(d_info[p][0]['HostPort'])
-
-			if port in mapped_ports:
-				mapping = port
-
-			port_bindings.append([port, mapping])
-
-		config['PORT_BINDINGS_STR'] = ", ".join(["%d > %d" % (p[0], p[1]) for p in port_bindings])
+		config, d_info = parse_ports(config)
 
 		routine = [
 			"%(DOCKER_EXE)s ps -a | grep %(IMAGE_NAME)s",
@@ -43,8 +80,21 @@ def generate_run_routine(config=None, dest_d=None, src_dirs=None):
 			"\techo \"ip address: %(DOCKER_IP)s\"",
 			"\techo \"port mappings: %(PORT_BINDINGS_STR)s\"",
 			"else",
-			"\tif [[ $1 == \"shell\" ]]; then",
-			("\t\t%s /bin/bash" % r).replace("-dPt", "-iPt"),
+			"\tif [[ $1 == \"shell\" ]]; then"
+		]
+
+		if 'SSH_PRIV_KEY' not in config.keys() or 'SSH_PORT' not in config.keys():
+			routine.append(("\t\t%s /bin/bash" % r).replace("-dPt", "-iPt"))
+		else:
+			ssh_routine = [
+				"\t\t%s ./run.sh" % r,
+				"\t\tsleep 5",
+				"\t\tssh -o IdentitiesOnly=yes -i %(SSH_PRIV_KEY)s -p %(SSH_PORT)d %(USER_NAME)s@%(DOCKER_IP)s"
+			]
+
+			routine += ssh_routine
+
+		routine += [
 			"\telif [[ $1 == \"update\" ]]; then",
 			"\t\t./update.sh",
 			"\t\texit",
@@ -52,18 +102,17 @@ def generate_run_routine(config=None, dest_d=None, src_dirs=None):
 			"fi"
 		]
 
-		if generate_update_routine(config, src_dirs=src_dirs):
-			return build_routine([r % config for r in routine], dest_d=os.path.join(BASE_DIR, "run.sh") if dest_d is None else dest_d)
+		save_config(config, with_config=with_config)
+
+		if generate_update_routine(config, src_dirs=src_dirs, with_config=with_config):
+			return build_routine([r % config for r in routine], to_file=os.path.join(BASE_DIR if with_config is None else os.path.dirname(with_config), "run.sh"))
 	
 	except Exception as e:
 		print e, type(e)
 
 	return False
 
-def generate_shutdown_routine(config=None, dest_d=None):
-	if config is None:
-		config = __load_config(BASE_DIR, "config.json")
-
+def generate_shutdown_routine(config, with_config=None):
 	try:
 		routine = [
 			"echo $1 | grep y",
@@ -75,13 +124,13 @@ def generate_shutdown_routine(config=None, dest_d=None):
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
 		]
 		
-		return build_routine([r % config for r in routine], dest_d=os.path.join(BASE_DIR, "shutdown.sh") if dest_d is None else dest_d)
+		return build_routine([r % config for r in routine], to_file=os.path.join(BASE_DIR if with_config is None else os.path.dirname(with_config), "shutdown.sh"))
 	except Exception as e:
 		print e, type(e)
 
 	return False
 
-def generate_init_routine(config, dest_d=None):
+def generate_init_routine(config, with_config=None):
 	if 'DOCKER_EXE' not in config.keys():
 		config['DOCKER_EXE'] = get_docker_exe()
 
@@ -99,16 +148,28 @@ def generate_init_routine(config, dest_d=None):
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
 		]
 
-		del config['USER_PWD']
-		save_config(config)
+		if 'SSH_PUB_KEY' in config.keys():
+			ssh_routine = [
+				"mkdir src/.ssh",
+				"cp %(SSH_PUB_KEY)s src/.ssh/authorized_keys"
+			]
 
-		return build_routine([r % config for r in routine], dest_d=dest_d)
+			routine = ssh_routine + routine
+
+		if 'USER_PWD' in config.keys():
+			del config['USER_PWD']
+		else:
+			print "NO USER PWD"
+		
+		save_config(config, with_config=with_config)
+
+		return build_routine([r % config for r in routine])
 	except Exception as e:
 		print e, type(e)
 
 	return False
 
-def generate_build_routine(config, dest_d=None):
+def generate_build_routine(config):
 	if 'DOCKER_EXE' not in config.keys():
 		config['DOCKER_EXE'] = get_docker_exe()
 
@@ -127,13 +188,15 @@ def generate_build_routine(config, dest_d=None):
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
 		]
 
-		return build_routine([r % config for r in routine], dest_d=dest_d)
+		return build_routine([r % config for r in routine])
 	except Exception as e:
 		print e, type(e)
 
 	return False
 
-def generate_update_routine(config, dest_d=None, src_dirs=None):
+def generate_update_routine(config, with_config=None, src_dirs=None):
+	config['WITH_CONFIG'] = os.path.join(BASE_DIR, "config.json") if with_config is None else with_config
+
 	try:
 		routine = [
 			"THIS_DIR=$(pwd)",
@@ -152,7 +215,7 @@ def generate_update_routine(config, dest_d=None, src_dirs=None):
 		routine += [
 			"cd $EXPRESS_DIR",
 			"source venv/bin/activate",
-			"python %(COMMIT_TO)s.py update",
+			"python %(COMMIT_TO)s.py update %(WITH_CONFIG)s",
 			"if ([ $? -eq 0 ]); then",
 			"\t%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
 			"\trm Dockerfile",
@@ -165,7 +228,7 @@ def generate_update_routine(config, dest_d=None, src_dirs=None):
 			"cd $THIS_DIR"
 		]
 
-		return build_routine([r % config for r in routine], dest_d=os.path.join(BASE_DIR, "update.sh") if dest_d is None else dest_d)
+		return build_routine([r % config for r in routine], to_file=os.path.join(BASE_DIR if with_config is None else os.path.dirname(with_config), "update.sh"))
 
 	except Exception as e:
 		print e, type(e)
@@ -240,9 +303,9 @@ def get_docker_ip():
 
 	return docker_ip
 
-def build_routine(routine, to_file=None, dest_d=None):
+def build_routine(routine, to_file=None):
 	if to_file is None:
-		to_file = os.path.join(BASE_DIR, ".routine.sh") if dest_d is None else dest_d
+		to_file = os.path.join(BASE_DIR, ".routine.sh")
 
 	try:
 		with open(to_file, 'wb+') as r:
