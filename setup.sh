@@ -35,10 +35,4 @@ for DR in "${D_ROUTINES[@]}"; do
 	fi
 done
 
-cp dutils/stop.sh .
-chmod +x run.sh
-chmod +x shutdown.sh
-chmod +x update.sh
-chmod +x stop.sh
-
 do_exit

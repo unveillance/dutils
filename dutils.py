@@ -32,7 +32,7 @@ def validate_private_key(ssh_priv_key, with_config):
 
 def parse_ports(config):
 	try:
-		d_info = json.loads(stdin)[0]['HostConfig']['PortBindings']
+		d_info = json.loads(stdin.read())[0]['HostConfig']['PortBindings']
 	except Exception as e:
 		print "could not get any stdin."
 		print e, type(e)
@@ -56,6 +56,25 @@ def parse_ports(config):
 	config['PORT_BINDINGS_STR'] = ", ".join(["%d > %d" % (p[0], p[1]) for p in port_bindings])
 
 	return config, d_info
+
+def finalize_assets(with_config=None):
+	if with_config is None:
+		dir_root = BASE_DIR
+	else:
+		dir_root = os.path.dirname(with_config)
+
+	try:
+		with settings(warn_only=True):
+			local("cp dutils/stop.sh %s" % dir_root)
+			for f in ['run', 'update', 'shutdown', 'stop']:
+				if os.path.exists(os.path.join(dir_root, "%s.sh" % f)):
+					local("chmod +x %s" % os.path.join(dir_root, "%s.sh" % f))
+		return True
+		
+	except Exception as e:
+		print e, type(e)
+
+	return False
 
 def generate_run_routine(config, with_config=None, src_dirs=None):
 	if 'PUBLISH_PORTS' not in config.keys():
@@ -89,7 +108,7 @@ def generate_run_routine(config, with_config=None, src_dirs=None):
 			ssh_routine = [
 				"\t\t%s ./run.sh" % r,
 				"\t\tsleep 5",
-				"\t\tssh -o IdentitiesOnly=yes -i %(SSH_PRIV_KEY)s -p %(SSH_PORT)d %(USER_NAME)s@%(DOCKER_IP)s"
+				"\t\tssh -o IdentitiesOnly=yes -i %(SSH_PRIV_KEY)s -p %(SSH_PORT)d %(USER)s@%(DOCKER_IP)s"
 			]
 
 			routine += ssh_routine
@@ -169,7 +188,7 @@ def generate_init_routine(config, with_config=None):
 
 	return False
 
-def generate_build_routine(config):
+def generate_build_routine(config, with_config=None):
 	if 'DOCKER_EXE' not in config.keys():
 		config['DOCKER_EXE'] = get_docker_exe()
 
@@ -177,12 +196,17 @@ def generate_build_routine(config):
 		print "no docker exe."
 		return False
 
+	if with_config is None:
+		with_config = os.path.join(BASE_DIR, "config.json")
+
+	config['WITH_CONFIG'] = with_config
+
 	try:
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
 			"%(DOCKER_EXE)s rmi %(IMAGE_NAME)s:init",
 			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest",
-			"echo $(%(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit",
+			"echo $(%(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit %(WITH_CONFIG)s",
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
