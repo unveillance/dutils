@@ -57,6 +57,10 @@ def parse_ports(config):
 
 	return config, d_info
 
+def resolve_publish_ports(publish_ports):
+	p_sep = " -p "
+	return ("%s%s" % (p_sep, p_sep.join(publish_ports)))[1:]
+
 def finalize_assets(with_config=None):
 	if with_config is None:
 		dir_root = BASE_DIR
@@ -80,8 +84,9 @@ def generate_run_routine(config, with_config=None, src_dirs=None):
 	if 'PUBLISH_PORTS' not in config.keys():
 		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
 	else:
-		p_sep = " -p "
-		config['PUBLISH_PORTS_STR'] = ("%s%s" % (p_sep, p_sep.join(["%d:%d" % (p, p) for p in config['PUBLISH_PORTS']])))[1:]
+		if 'PUBLISH_PORTS_STR' not in config.keys():
+			config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
+
 		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
 	
 	try:
@@ -157,10 +162,18 @@ def generate_init_routine(config, with_config=None):
 		print "no docker exe."
 		return False
 
+	if 'PUBLISH_PORTS' not in config.keys():
+		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(IMAGE_NAME)s:init"
+	else:
+		if 'PUBLISH_PORTS_STR' not in config.keys():
+			config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
+			
+		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:init"
+
 	try:
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:init .",
-			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(IMAGE_NAME)s:init",
+			r,
 			"echo \"Commiting image.  This might take awhile...\"",
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:init",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
@@ -196,23 +209,26 @@ def generate_build_routine(config, with_config=None):
 		print "no docker exe."
 		return False
 
-	if with_config is None:
-		with_config = os.path.join(BASE_DIR, "config.json")
+	if 'PUBLISH_PORTS' not in config.keys():
+		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
+	else:
+		if 'PUBLISH_PORTS_STR' not in config.keys():
+			config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
 
-	config['WITH_CONFIG'] = with_config
+		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
 
 	try:
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
 			"%(DOCKER_EXE)s rmi %(IMAGE_NAME)s:init",
-			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest",
-			"echo $(%(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit %(WITH_CONFIG)s",
+			r,
+			"echo $(%(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit",
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
 		]
 
-		return build_routine([r % config for r in routine])
+		return build_routine([r % config for r in routine], dest_d=dest_d)
 	except Exception as e:
 		print e, type(e)
 
