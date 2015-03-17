@@ -15,6 +15,10 @@ DUtilsKeyDefaults = {
 	'IMAGE_NAME' : DUtilsKey("IMAGE_NAME", "name of docker image", DDOC_NAME, DDOC_NAME, None),
 }
 
+DUtilsTransforms = {
+	'PORT_TO_INT' : lambda p : int(p.strip())
+}
+
 def is_acceptable_str(str):
 	try:
 		return re.match(r'.*[\s]+', str) is None
