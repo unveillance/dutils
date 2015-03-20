@@ -107,6 +107,7 @@ def __load_config(with_config=None):
 		with open(with_config, 'rb') as c:
 			return json.loads(c.read())
 	except Exception as e:
+		print "__load_config Error:"
 		print e, type(e)
 	
 	return None

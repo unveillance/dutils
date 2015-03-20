@@ -1,5 +1,4 @@
 import re, os, json
-from sys import stdin
 from fabric.api import settings, local
 
 from conf import BASE_DIR, __load_config, save_config, append_to_config
@@ -32,7 +31,10 @@ def validate_private_key(ssh_priv_key, with_config):
 
 def parse_ports(config):
 	try:
-		d_info = json.loads(stdin.read())[0]['HostConfig']['PortBindings']
+		with settings(warn_only=True):
+			d_info = local("%(DOCKER_EXE)s inspect %(IMAGE_NAME)s" % config, capture=True)
+
+		d_info = json.loads(d_info)[0]['HostConfig']['PortBindings']
 	except Exception as e:
 		print "could not get any stdin."
 		print e, type(e)
@@ -217,18 +219,22 @@ def generate_build_routine(config, with_config=None):
 
 		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
 
+	c = "python %(COMMIT_TO)s.py commit" % config
+	if with_config is not None:
+		c = "%s %s" % (c, with_config)
+
 	try:
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
 			"%(DOCKER_EXE)s rmi %(IMAGE_NAME)s:init",
 			r,
-			"echo $(%(DOCKER_EXE)s inspect %(IMAGE_NAME)s) | python %(COMMIT_TO)s.py commit",
+			c,
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
 			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
 		]
 
-		return build_routine([r % config for r in routine], dest_d=dest_d)
+		return build_routine([r % config for r in routine])
 	except Exception as e:
 		print e, type(e)
 

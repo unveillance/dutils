@@ -23,7 +23,7 @@ source venv/bin/activate
 pip install -r dutils/requirements.txt
 
 # Run Docker init
-declare -a D_ROUTINES=("init" "build" "commit")
+declare -a D_ROUTINES=("init" "build")
 for DR in "${D_ROUTINES[@]}"; do
 	python $DUTILS_PKG_ROOT.py $DR $2
 	if ([ $?  -eq 0 ]); then
