@@ -232,7 +232,8 @@ def generate_build_routine(config, with_config=None):
 			c,
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
-			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
+			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s",
+			"%(DOCKER_EXE)s rmi $(%(DOCKER_EXE)s images -q -f dangling=true)"
 		]
 
 		return build_routine([r % config for r in routine])
