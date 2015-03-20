@@ -95,10 +95,11 @@ def generate_run_routine(config, with_config=None, src_dirs=None):
 		config, d_info = parse_ports(config)
 
 		routine = [
+			"DIR=$( cd \"$( dirname \"${BASH_SOURCE[0]}\" )\" && pwd )",
 			"%(DOCKER_EXE)s ps -a | grep %(IMAGE_NAME)s",
 			"if ([ $? -eq 0 ]); then",
 			"\techo \"Stopping current instance first.\"",
-			"\t./stop.sh",
+			"\t$DIR/stop.sh",
 			"fi",
 			"if ([ $# -eq 0 ]); then",
 			"\t%s ./run.sh" % r,
@@ -122,7 +123,7 @@ def generate_run_routine(config, with_config=None, src_dirs=None):
 
 		routine += [
 			"\telif [[ $1 == \"update\" ]]; then",
-			"\t\t./update.sh",
+			"\t\t$DIR/update.sh",
 			"\t\texit",
 			"\tfi",
 			"fi"
@@ -245,9 +246,10 @@ def generate_update_routine(config, with_config=None, src_dirs=None):
 
 	try:
 		routine = [
+			"DIR=$( cd \"$( dirname \"${BASH_SOURCE[0]}\" )\" && pwd )",
 			"THIS_DIR=$(pwd)",
 			"EXPRESS_DIR=%s" % BASE_DIR,
-			"./stop.sh"
+			"$DIR/stop.sh"
 		]
 
 		if src_dirs is not None:
@@ -265,7 +267,7 @@ def generate_update_routine(config, with_config=None, src_dirs=None):
 			"if ([ $? -eq 0 ]); then",
 			"\t%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
 			"\trm Dockerfile",
-			"\t%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(IMAGE_NAME)s:latest ./update.sh",
+			"\t%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(IMAGE_NAME)s:latest $DIR/update.sh",
 			"\t%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
 			"\t%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
 			"\t%(DOCKER_EXE)s rm %(IMAGE_NAME)s",
