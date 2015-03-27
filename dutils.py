@@ -287,8 +287,10 @@ def generate_update_routine(config, with_config=None, src_dirs=None):
 	return False
 
 def build_cron_job(jobs, dest_d=None):
+	from crontab import CronTab
+
 	tabfile = os.path.join(BASE_DIR if dest_d is None else dest_d, "cron.tab")
-	cron = CronTab(tabfile(tabfile))
+	cron = CronTab()
 
 	try:
 		for j in jobs:
