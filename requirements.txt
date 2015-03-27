@@ -1,3 +1,5 @@
 ecdsa
 pycrypto
 fabric
+pyyaml
+python-crontab

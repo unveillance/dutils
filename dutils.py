@@ -3,6 +3,8 @@ from fabric.api import settings, local
 
 from conf import BASE_DIR, __load_config, save_config, append_to_config
 
+cron_units = ["mins", "minutes", "min", "minute", "hours", "hour", "days", "day"]
+
 def validate_private_key(ssh_priv_key, with_config):
 	config = __load_config(os.path.join(BASE_DIR, "config.json") if with_config is None else with_config)
 
@@ -278,6 +280,37 @@ def generate_update_routine(config, with_config=None, src_dirs=None):
 		]
 
 		return build_routine([r % config for r in routine], to_file=os.path.join(BASE_DIR if with_config is None else os.path.dirname(with_config), "update.sh"))
+
+	except Exception as e:
+		print e, type(e)
+
+	return False
+
+def build_cron_job(jobs, dest_d=None):
+	tabfile = os.path.join(BASE_DIR if dest_d is None else dest_d, "cron.tab")
+	cron = CronTab(tabfile(tabfile))
+
+	try:
+		for j in jobs:
+			if j['unit'] not in cron_units:
+				continue
+
+			if 'frequency' not in j.keys():
+				continue
+
+			job = cron.new(
+				command=j['command'],
+				comment=j['comment'])
+
+			if j['unit'] in ["mins", "minutes", "min", "minute"]:
+				job.every(j['frequency']).minutes()
+			elif j['unit'] in ["hours", "hour"]:
+				job.every(j['frequency']).hours()
+			elif j['unit'] in ["days", "day"]:
+				job.every(j['frequency']).days()
+
+		cron.write(tabfile)
+		return True
 
 	except Exception as e:
 		print e, type(e)
