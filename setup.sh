@@ -14,6 +14,7 @@ function do_exit {
 }
 
 DUTILS_PKG_ROOT=$1
+shift
 
 # Create virtualenv
 virtualenv venv
@@ -25,7 +26,7 @@ pip install -r dutils/requirements.txt
 # Run Docker init
 declare -a D_ROUTINES=("init" "build" "finish")
 for DR in "${D_ROUTINES[@]}"; do
-	python $DUTILS_PKG_ROOT.py $DR $2
+	python $DUTILS_PKG_ROOT.py $DR "$@"
 	if ([ $?  -eq 0 ]); then
 		run_docker_routine
 		echo "Moving on!"

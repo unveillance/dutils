@@ -31,7 +31,7 @@ def validate_private_key(ssh_priv_key, with_config):
 		'SSH_PRIV_KEY' : os.path.abspath(ssh_priv_key)
 	}, with_config=with_config)
 
-def parse_ports(config):
+def __parse_ports(config):
 	try:
 		with settings(warn_only=True):
 			d_info = local("%(DOCKER_EXE)s inspect %(IMAGE_NAME)s" % config, capture=True)
@@ -42,7 +42,7 @@ def parse_ports(config):
 		print e, type(e)
 		return config, None
 
-	mapped_ports = [] if 'PUBLISH_PORTS' not in config.keys() else config['PUBLISH_PORTS']
+	mapped_ports = [] if 'PUBLISHED_PORTS' not in config.keys() else config['PUBLISHED_PORTS']
 	port_bindings = []
 
 	for p in d_info.keys():
@@ -52,8 +52,12 @@ def parse_ports(config):
 		if port == 22:
 			config['SSH_PORT'] = mapping
 
-		if port in mapped_ports:
-			mapping = port
+		if len(mapped_ports) > 0 and port in mapped_ports:
+			try:
+				m_name = [n for n in config.keys() if config[n] == port][0]
+				config["%s_MAPPED" % m_name] = mapping
+			except Exception as e:
+				print e, type(e)
 
 		port_bindings.append([port, mapping])
 
@@ -84,17 +88,17 @@ def finalize_assets(with_config=None):
 
 	return False
 
-def generate_run_routine(config, with_config=None, src_dirs=None):
-	if 'PUBLISH_PORTS' not in config.keys():
-		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
-	else:
-		if 'PUBLISH_PORTS_STR' not in config.keys():
-			config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
-
-		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
-	
+def generate_run_routine(config, with_config=None, src_dirs=None, return_config=False):
 	try:
-		config, d_info = parse_ports(config)
+		config, d_info = __parse_ports(config)
+
+		if 'PUBLISH_PORTS' not in config.keys():
+			r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
+		else:
+			if 'PUBLISH_PORTS_STR' not in config.keys():
+				config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
+
+			r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
 
 		routine = [
 			"DIR=$( cd \"$( dirname \"${BASH_SOURCE[0]}\" )\" && pwd )",
@@ -134,7 +138,11 @@ def generate_run_routine(config, with_config=None, src_dirs=None):
 		save_config(config, with_config=with_config)
 
 		if generate_update_routine(config, src_dirs=src_dirs, with_config=with_config):
-			return build_routine([r % config for r in routine], to_file=os.path.join(BASE_DIR if with_config is None else os.path.dirname(with_config), "run.sh"))
+			res = build_routine([r % config for r in routine], to_file=os.path.join(BASE_DIR if with_config is None else os.path.dirname(with_config), "run.sh"))
+			if(return_config):
+				return res, config
+
+			return res
 	
 	except Exception as e:
 		print e, type(e)
@@ -330,12 +338,12 @@ def build_bash_profile(directives, dest_d=None):
 
 	return False
 
-def build_dockerfile(src_dockerfile, config, dest_d=None):
-	dockerfile = []
+def __parse_replace(src_file, config):
+	new_file = []
 	rx = re.compile("\$\{(%s)\}" % "|".join(config.keys()))
 
 	try:
-		with open(src_dockerfile, 'rb') as d:
+		with open(src_file, 'rb') as d:
 			for line in d.read().splitlines():
 				for e in re.findall(rx, line):
 					try:
@@ -343,12 +351,37 @@ def build_dockerfile(src_dockerfile, config, dest_d=None):
 					except Exception as ex:
 						print e, ex, type(ex)
 
-				dockerfile.append(line)
+				new_file.append(line)
+		return new_file
+	except Exception as e:
+		print e, type(e)
 
-		with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "Dockerfile"), 'wb+') as d:
-			d.write("\n".join(dockerfile))
+	return None
+
+def build_dockerfile(src_dockerfile, config, dest_d=None):
+	try:
+		dockerfile = __parse_replace(src_dockerfile, config)
 		
-		return True
+		if dockerfile is not None:
+			with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "Dockerfile"), 'wb+') as d:
+				d.write("\n".join(dockerfile))
+		
+			return True
+
+	except Exception as e:
+		print e, type(e)
+
+	return False
+
+def build_nginx_config(src_nginx_config, config, dest_d=None):
+	try:
+		nginx_config = __parse_replace(src_nginx_config, config)
+		
+		if nginx_config is not None:
+			with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "nginx.conf")m 'wb+') as n:
+				n.write("\n".join(nginx_config))
+
+			return True
 
 	except Exception as e:
 		print e, type(e)
