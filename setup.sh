@@ -15,6 +15,7 @@ function do_exit {
 
 DUTILS_PKG_ROOT=$1
 shift
+echo "$@"
 
 # Create virtualenv
 virtualenv venv

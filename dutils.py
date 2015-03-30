@@ -42,7 +42,7 @@ def __parse_ports(config):
 		print e, type(e)
 		return config, None
 
-	mapped_ports = [] if 'PUBLISHED_PORTS' not in config.keys() else config['PUBLISHED_PORTS']
+	mapped_ports = [] if 'MAPPED_PORTS' not in config.keys() else config['MAPPED_PORTS']
 	port_bindings = []
 
 	for p in d_info.keys():
@@ -50,7 +50,7 @@ def __parse_ports(config):
 		mapping = int(d_info[p][0]['HostPort'])
 
 		if port == 22:
-			config['SSH_PORT'] = mapping
+			config['SSH_PORT_MAPPED'] = mapping
 
 		if len(mapped_ports) > 0 and port in mapped_ports:
 			try:
@@ -62,6 +62,7 @@ def __parse_ports(config):
 		port_bindings.append([port, mapping])
 
 	config['PORT_BINDINGS_STR'] = ", ".join(["%d > %d" % (p[0], p[1]) for p in port_bindings])
+	config['PORT_PUBLISH_STR'] = "-p %s" % " -p ".join(["%d:%d" % (p[0], p[1]) for p in port_bindings])
 
 	return config, d_info
 
@@ -92,13 +93,11 @@ def generate_run_routine(config, with_config=None, src_dirs=None, return_config=
 	try:
 		config, d_info = __parse_ports(config)
 
-		if 'PUBLISH_PORTS' not in config.keys():
-			r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
-		else:
-			if 'PUBLISH_PORTS_STR' not in config.keys():
-				config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
+		if d_info is None:
+			print "No docker info to inspect"
+			return False
 
-			r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
+		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
 
 		routine = [
 			"DIR=$( cd \"$( dirname \"${BASH_SOURCE[0]}\" )\" && pwd )",
@@ -116,13 +115,13 @@ def generate_run_routine(config, with_config=None, src_dirs=None, return_config=
 			"\tif [[ $1 == \"shell\" ]]; then"
 		]
 
-		if 'SSH_PRIV_KEY' not in config.keys() or 'SSH_PORT' not in config.keys():
+		if 'SSH_PRIV_KEY' not in config.keys() or 'SSH_PORT_MAPPED' not in config.keys():
 			routine.append(("\t\t%s /bin/bash" % r).replace("-dPt", "-iPt"))
 		else:
 			ssh_routine = [
 				"\t\t%s ./run.sh" % r,
 				"\t\tsleep 5",
-				"\t\tssh -o IdentitiesOnly=yes -i %(SSH_PRIV_KEY)s -p %(SSH_PORT)d %(USER)s@%(DOCKER_IP)s"
+				"\t\tssh -o IdentitiesOnly=yes -i %(SSH_PRIV_KEY)s -p %(SSH_PORT_MAPPED)d %(USER)s@%(DOCKER_IP)s"
 			]
 
 			routine += ssh_routine
@@ -139,7 +138,8 @@ def generate_run_routine(config, with_config=None, src_dirs=None, return_config=
 
 		if generate_update_routine(config, src_dirs=src_dirs, with_config=with_config):
 			res = build_routine([r % config for r in routine], to_file=os.path.join(BASE_DIR if with_config is None else os.path.dirname(with_config), "run.sh"))
-			if(return_config):
+			
+			if return_config:
 				return res, config
 
 			return res
@@ -175,18 +175,10 @@ def generate_init_routine(config, with_config=None):
 		print "no docker exe."
 		return False
 
-	if 'PUBLISH_PORTS' not in config.keys():
-		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(IMAGE_NAME)s:init"
-	else:
-		if 'PUBLISH_PORTS_STR' not in config.keys():
-			config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
-			
-		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:init"
-
 	try:
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:init .",
-			r,
+			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -iPt %(IMAGE_NAME)s:init",
 			"echo \"Commiting image.  This might take awhile...\"",
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:init",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
@@ -222,14 +214,6 @@ def generate_build_routine(config, with_config=None):
 		print "no docker exe."
 		return False
 
-	if 'PUBLISH_PORTS' not in config.keys():
-		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest"
-	else:
-		if 'PUBLISH_PORTS_STR' not in config.keys():
-			config['PUBLISH_PORTS_STR'] = resolve_publish_ports(config['PUBLISH_PORTS'])
-
-		r = "%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(PUBLISH_PORTS_STR)s %(IMAGE_NAME)s:latest"
-
 	c = "python %(COMMIT_TO)s.py commit" % config
 	if with_config is not None:
 		c = "%s %s" % (c, with_config)
@@ -238,7 +222,7 @@ def generate_build_routine(config, with_config=None):
 		routine = [
 			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
 			"%(DOCKER_EXE)s rmi %(IMAGE_NAME)s:init",
-			r,
+			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest",
 			c,
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
@@ -378,7 +362,7 @@ def build_nginx_config(src_nginx_config, config, dest_d=None):
 		nginx_config = __parse_replace(src_nginx_config, config)
 		
 		if nginx_config is not None:
-			with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "nginx.conf")m 'wb+') as n:
+			with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "nginx.conf"), 'wb+') as n:
 				n.write("\n".join(nginx_config))
 
 			return True
