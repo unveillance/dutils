@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# example: dutils/setup.sh compass_express /path/to/config.json
+# example: dutils/setup.sh compass_express /path/to/config.json --nginx-conf=/path/to/an/nginx/template.conf
 
 function run_docker_routine {
 	chmod +x .routine.sh
@@ -16,6 +16,11 @@ function do_exit {
 DUTILS_PKG_ROOT=$1
 shift
 echo "$@"
+
+THIS_DIR=`pwd`
+DUTILS_DIR=$(cd "$(dirname "{BASH_SOURCE[0]}")" && pwd)
+echo $DUTILS_DIR
+cd $DUTILS_DIR
 
 # Create virtualenv
 virtualenv venv
@@ -37,4 +42,5 @@ for DR in "${D_ROUTINES[@]}"; do
 	fi
 done
 
+cd $THIS_DIR
 do_exit

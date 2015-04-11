@@ -241,8 +241,8 @@ def generate_update_routine(config, with_config=None, src_dirs=None):
 
 	try:
 		routine = [
-			"DIR=$( cd \"$( dirname \"${BASH_SOURCE[0]}\" )\" && pwd )",
 			"THIS_DIR=$(pwd)",
+			"DIR=$( cd \"$( dirname \"${BASH_SOURCE[0]}\" )\" && pwd )",
 			"EXPRESS_DIR=%s" % BASE_DIR,
 			"$DIR/stop.sh"
 		]
