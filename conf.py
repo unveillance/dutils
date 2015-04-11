@@ -42,8 +42,8 @@ def get_directive(args, flags):
 				continue
 
 			directive = a.split("=")
-			if cmd[0][1:] in flags:
-				directives.append(cmd[1])
+			if directive[0][2:] in flags:
+				directives.append(directive[1])
 
 	if len(directives) == 0:
 		return None

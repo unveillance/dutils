@@ -32,9 +32,13 @@ pip install -r dutils/requirements.txt
 # Run Docker init
 declare -a D_ROUTINES=("init" "build" "finish")
 for DR in "${D_ROUTINES[@]}"; do
+	echo "PHASE: $DR"
 	python $DUTILS_PKG_ROOT.py $DR "$@"
 	if ([ $?  -eq 0 ]); then
-		run_docker_routine
+		if [ -e ".routine.sh" ]; then
+			run_docker_routine
+		fi
+
 		echo "Moving on!"
 	else
 		echo "FAILED."
