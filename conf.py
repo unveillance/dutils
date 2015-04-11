@@ -16,7 +16,8 @@ DUtilsKeyDefaults = {
 }
 
 DUtilsTransforms = {
-	'PORT_TO_INT' : lambda p : int(p.strip())
+	'PORT_TO_INT' : lambda p : int(p.strip()),
+	'NONE_IF_EMPTY' : lambda s : None if len(s) == 0 else s
 }
 
 def is_acceptable_str(str):
@@ -26,6 +27,30 @@ def is_acceptable_str(str):
 		print e, type(e)
 
 	return False
+
+def get_directive(args, flags):
+	if type(flags) in [str, unicode]:
+		flags = [flags]
+
+	if type(flags) is not list:
+		return None
+
+	directives = []
+	if len(args) >= 2:
+		for a in args[1:]:
+			if re.match(r'^\-\-', a) is None:
+				continue
+
+			directive = a.split("=")
+			if cmd[0][1:] in flags:
+				directives.append(cmd[1])
+
+	if len(directives) == 0:
+		return None
+	elif len(directives) == 1:
+		directives = directives[0]
+
+	return directives
 
 def build_config(config_keys, with_config=None):
 	config = {}
