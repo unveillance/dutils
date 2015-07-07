@@ -1,4 +1,4 @@
-import os, json, re
+import os, json, re, getpass
 from collections import namedtuple
 from fabric.operations import prompt
 
@@ -71,7 +71,18 @@ def build_config(config_keys, with_config=None):
 	for c in config_keys:
 		if c.label not in config.keys():
 			print c.description
-			value = prompt("[ENTER for default ( %s )]: " % c.default)
+			prompt_ = "[ENTER for default ( %s )]: " % c.default
+
+			'''
+			i don't yet have a glamourous way of discerning whether 
+			a config key should be treated as a password yet.
+			so for now, it's a whitelist.
+			'''
+			
+			if c.label not in ["USER_PWD"]:
+				value = prompt(prompt_)
+			else:
+				value = capture_pwd(c, prompt_)
 
 			if len(value) > 0:
 				if c.value_transform is None:
@@ -87,6 +98,19 @@ def build_config(config_keys, with_config=None):
 				config[c.label] = c.default
 
 	return config
+
+def capture_pwd(config_key, prompt_):
+	value = getpass(prompt_)
+	if len(value) == 0:
+		return value
+
+	confirm_value = getpass("Confirm %s" % config_key.label)
+
+	if value == confirm_value:
+		return value
+
+	print "TRY AGAIN! %s must match!" % config_key.label
+	return capture_pwd(config_key, prompt_)
 
 def save_config(config, with_config=None):
 	if with_config is None:
