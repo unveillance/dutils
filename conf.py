@@ -1,4 +1,5 @@
-import os, json, re, getpass
+import os, json, re
+from getpass import getpass
 from collections import namedtuple
 from fabric.operations import prompt
 
@@ -71,7 +72,7 @@ def build_config(config_keys, with_config=None):
 	for c in config_keys:
 		if c.label not in config.keys():
 			print c.description
-			prompt_ = "[ENTER for default ( %s )]: " % c.default
+			prompt_ = "[ENTER for default ( %s )]: " % str(c.default)
 
 			'''
 			i don't yet have a glamourous way of discerning whether 
@@ -104,7 +105,7 @@ def capture_pwd(config_key, prompt_):
 	if len(value) == 0:
 		return value
 
-	confirm_value = getpass("Confirm %s" % config_key.label)
+	confirm_value = getpass("Confirm %s:" % config_key.label)
 
 	if value == confirm_value:
 		return value
@@ -148,7 +149,7 @@ def append_to_config(append_to_config, with_config=None, return_config=False):
 
 	return False
 
-def __load_config(with_config=None):
+def load_config(with_config=None):
 	if with_config is None:
 		with_config = os.path.join(BASE_DIR, "config.json")
 		
@@ -156,10 +157,10 @@ def __load_config(with_config=None):
 		with open(with_config, 'rb') as c:
 			return json.loads(c.read())
 	except Exception as e:
-		print "__load_config Error:"
+		print "load_config Error:"
 		print e, type(e)
 	
-	return None
+	return {}
 
 def get_config(keys, with_config=None):
 	if with_config is None:
@@ -169,7 +170,7 @@ def get_config(keys, with_config=None):
 		return None
 
 	if type(with_config) in [str, unicode]:
-		with_config = __load_config(with_config)
+		with_config = load_config(with_config)
 
 	if with_config is None:
 		return False

@@ -1,12 +1,12 @@
 import re, os, json
 from fabric.api import settings, local
 
-from conf import BASE_DIR, __load_config, save_config, append_to_config
+from conf import BASE_DIR, load_config, save_config, append_to_config
 
 cron_units = ["mins", "minutes", "min", "minute", "hours", "hour", "days", "day"]
 
 def validate_private_key(ssh_priv_key, with_config):
-	config = __load_config(os.path.join(BASE_DIR, "config.json") if with_config is None else with_config)
+	config = load_config(os.path.join(BASE_DIR, "config.json") if with_config is None else with_config)
 
 	if ssh_priv_key is None:
 		ssh_priv_key = os.path.join(BASE_DIR, "%s.privkey" % config['IMAGE_NAME'])
@@ -342,12 +342,12 @@ def __parse_replace(src_file, config):
 
 	return None
 
-def build_dockerfile(src_dockerfile, config, dest_d=None):
+def build_dockerfile(src_dockerfile, config, dst=None):
 	try:
 		dockerfile = __parse_replace(src_dockerfile, config)
 		
 		if dockerfile is not None:
-			with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "Dockerfile"), 'wb+') as d:
+			with open(os.path.join(BASE_DIR if dst is None else dst, "Dockerfile"), 'wb+') as d:
 				d.write("\n".join(dockerfile))
 		
 			return True
@@ -418,3 +418,5 @@ def build_routine(routine, to_file=None):
 		print e, type(e)
 
 	return False
+
+
