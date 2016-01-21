@@ -182,7 +182,8 @@ def generate_init_routine(config, with_config=None):
 			"echo \"Commiting image.  This might take awhile...\"",
 			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:init",
 			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
-			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s"
+			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s",
+			"%(DOCKER_EXE)s rmi $(%(DOCKER_EXE)s images -q -f dangling=true)"
 		]
 
 		if 'SSH_PUB_KEY' in config.keys():
@@ -206,7 +207,7 @@ def generate_init_routine(config, with_config=None):
 
 	return False
 
-def generate_build_routine(config, with_config=None):
+def generate_build_routine(config, dst=None):
 	if 'DOCKER_EXE' not in config.keys():
 		config['DOCKER_EXE'] = get_docker_exe()
 
@@ -214,23 +215,16 @@ def generate_build_routine(config, with_config=None):
 		print "no docker exe."
 		return False
 
-	c = "python %(COMMIT_TO)s.py commit" % config
-	if with_config is not None:
-		c = "%s %s" % (c, with_config)
-
 	try:
 		routine = [
-			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:latest .",
-			"%(DOCKER_EXE)s rmi %(IMAGE_NAME)s:init",
-			"%(DOCKER_EXE)s run --name %(IMAGE_NAME)s -dPt %(IMAGE_NAME)s:latest",
-			c,
-			"%(DOCKER_EXE)s commit %(IMAGE_NAME)s %(IMAGE_NAME)s:latest",
-			"%(DOCKER_EXE)s stop %(IMAGE_NAME)s",
-			"%(DOCKER_EXE)s rm %(IMAGE_NAME)s",
-			"%(DOCKER_EXE)s rmi $(%(DOCKER_EXE)s images -q -f dangling=true)"
+			"%(DOCKER_EXE)s build -t %(IMAGE_NAME)s:%(PROJECT_NAME)s .",
+			"%(DOCKER_EXE)s run --name %(PROJECT_NAME)s -dt %(PUBLISH_DIRECTIVES)s %(IMAGE_NAME)s:%(PROJECT_NAME)s",
+			"%(DOCKER_EXE)s commit %(PROJECT_NAME)s %(IMAGE_NAME)s:%(PROJECT_NAME)s",
+			"%(DOCKER_EXE)s rmi $(%(DOCKER_EXE)s images -q -f dangling=true)",
+			"rm %(IMAGE_HOME)s/unveillance.secrets.json"
 		]
 
-		return build_routine([r % config for r in routine])
+		return build_routine([r % config for r in routine], dst=dst)
 	except Exception as e:
 		print e, type(e)
 
@@ -357,12 +351,12 @@ def build_dockerfile(src_dockerfile, config, dst=None):
 
 	return False
 
-def build_nginx_config(src_nginx_config, config, dest_d=None):
+def build_nginx_config(src_nginx_config, config, dst=None):
 	try:
 		nginx_config = __parse_replace(src_nginx_config, config)
 		
 		if nginx_config is not None:
-			with open(os.path.join(BASE_DIR if dest_d is None else dest_d, "nginx.conf"), 'wb+') as n:
+			with open(os.path.join(BASE_DIR if dst is None else dst, "nginx.conf"), 'wb+') as n:
 				n.write("\n".join(nginx_config))
 
 			return True
@@ -404,12 +398,9 @@ def get_docker_ip():
 
 	return docker_ip
 
-def build_routine(routine, to_file=None):
-	if to_file is None:
-		to_file = os.path.join(BASE_DIR, ".routine.sh")
-
+def build_routine(routine, dst=None):
 	try:
-		with open(to_file, 'wb+') as r:
+		with open(os.path.join(BASE_DIR if dst is None else dst, ".routine.sh"), 'wb+') as r:
 			r.write("\n".join(routine))
 		
 		return True
